@@ -1,0 +1,6 @@
+* The Game
+To run:
+#+begin_src sh
+  npm install
+  npm start
+#+end_src
