@@ -85,6 +85,22 @@ function getHelp(prompt: string):  MachineConfig<SDSContext, any, SDSEvent> {
     })
 }
 
+function one_character_change(new_word: string, old_word: string) {
+    var samesies = 0
+
+    for( var i = 0, len = 4; i < len; i++ ) { 
+        if (new_word[i] === old_word[i]) {
+            samesies += 1
+        } 
+    }
+
+    if (samesies === 3) {
+        return true
+    } else {
+        return false
+    }
+}
+
 const grammar: { [index: string]: { valid_word?: string,} } = {
     "hack": {valid_word: "hack"},
     "lack": {valid_word: "lack"},
@@ -260,8 +276,8 @@ export const dmMenu: MachineConfig<SDSContext, any, SDSEvent> = ({
                             target: 'start_game',
                         },
                         {
-                            // Word is valid and history does exist and word not in history
-                            cond: (context) => "valid_word" in (grammar[context.recResult] || {}) && Array.isArray(context.wordHistory) && !context.wordHistory.includes(context.recResult),
+                            // Word is valid and history does exist and word not in history and move valid
+                            cond: (context) => "valid_word" in (grammar[context.recResult] || {}) && Array.isArray(context.wordHistory) && !context.wordHistory.includes(context.recResult) && one_character_change(context.recResult, context.wordHistory[context.wordHistory.length - 1]),
                             actions: [
                                 cancel('maxsp'),
                                 assign((context) => {
@@ -272,6 +288,17 @@ export const dmMenu: MachineConfig<SDSContext, any, SDSEvent> = ({
                                 })
                             ],
                             target: 'start_game',
+                        },
+                        {
+                            // Word is valid and history does exist and word not in history and move invalid
+                            cond: (context) => "valid_word" in (grammar[context.recResult] || {}) && Array.isArray(context.wordHistory) && !context.wordHistory.includes(context.recResult) && !one_character_change(context.recResult, context.wordHistory[context.wordHistory.length - 1]),
+                            actions: [
+                                cancel('maxsp'),
+                                assign((context) => {
+                                    console.log("Word invalid! " + context.recResult)
+                                })
+                            ],
+                            target: '.lose_game_spelling',
                         },
                         {
                             cond: (context) => context.recResult === 'help',
@@ -312,6 +339,10 @@ export const dmMenu: MachineConfig<SDSContext, any, SDSEvent> = ({
                         },
                         lose_game_repetition: {
                             entry: say("That word has been said. Game over. Do not pass go. Do not collect two hundred dollars. Do not quit your day job. You lose."),
+                            always: "#root.dm.init",
+                        },
+                        lose_game_spelling: {
+                            entry: say("You fool! That word is not one character different from the last. You lose."),
                             always: "#root.dm.init",
                         },
                     }
