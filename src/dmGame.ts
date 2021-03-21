@@ -106,7 +106,7 @@ function computer_move(wordHistory: Array) {
     var last_word = wordHistory[wordHistory.length - 1]
     
     for (var key in grammar) { 
-        if ( one_character_change(key, last_word) ) { 
+        if ( one_character_change(key, last_word) && !wordHistory.includes(key) ) { 
             return key
         } 
     }
@@ -115,16 +115,15 @@ function computer_move(wordHistory: Array) {
 }
 
 const grammar: { [index: string]: { valid_word?: string,} } = {
-    "hack": {valid_word: "hack"},
-    "lack": {valid_word: "lack"},
-    "pack": {valid_word: "pack"},
-    "pace": {valid_word: "pace"},
-    "lace": {valid_word: "lace"},
+    // "back": {valid_word: "back"},
+    // "pack": {valid_word: "pack"},
+    // "pace": {valid_word: "pace"},
+    // "lace": {valid_word: "lace"},
     "lake": {valid_word: "lake"},
     "fake": {valid_word: "fake"},
     "make": {valid_word: "make"},
-    "mace": {valid_word: "mace"},
-    "mice": {valid_word: "mice"},
+    // "mace": {valid_word: "mace"},
+    // "mice": {valid_word: "mice"},
 }
 
 const boolgrammar: {[index: string]: {yes?: boolean, no?:boolean}} = {
@@ -217,39 +216,43 @@ export const dmMenu: MachineConfig<SDSContext, any, SDSEvent> = ({
         playGame: {
             initial: "confirm_rules",
             on: {
-                RECOGNISED: {
-                    cond: (context) => context.recResult === 'stop',
-                    target: 'stop',
-                },
+                RECOGNISED: [
+                    {
+                        cond: (context) => context.recResult === 'stop',
+                        target: 'stop',
+                    },
+                ]
             },
             states: {
                 hist: {type: 'history', history: 'deep'},
                 confirm_rules: {
                     initial: "prompt",
                     on:{ 
-                        RECOGNISED: [{
-                            cond: (context) => "yes" in (boolgrammar[context.recResult] || {}),
-                            actions: [
-                                cancel('maxsp'), 
-                                assign((context) => { return { confirm: boolgrammar[context.recResult].yes } })
-                            ],
-                            target: "start_game",
-                        },
-                        {
-                            cond: (context) => "no" in (boolgrammar[context.recResult] || {}),
-                            actions: [
-                                cancel('maxsp'),
-                                assign((context) => { return { confirm: boolgrammar[context.recResult].no } })
-                            ],
-                            target: "explain_rules",
-                        },
-                        {
-                            cond: (context) => context.recResult === 'help',
-                            target: '.help',
-                        },
-                        {   cond: (context) => context.recResult !== 'stop',
-                            target: ".nomatch",
-                        }]
+                        RECOGNISED: [
+                            {
+                                cond: (context) => "yes" in (boolgrammar[context.recResult] || {}),
+                                actions: [
+                                    cancel('maxsp'), 
+                                    assign((context) => { return { confirm: boolgrammar[context.recResult].yes } })
+                                ],
+                                target: "start_game",
+                            },
+                            {
+                                cond: (context) => "no" in (boolgrammar[context.recResult] || {}),
+                                actions: [
+                                    cancel('maxsp'),
+                                    assign((context) => { return { confirm: boolgrammar[context.recResult].no } })
+                                ],
+                                target: "explain_rules",
+                            },
+                            {
+                                cond: (context) => context.recResult === 'help',
+                                target: '.help',
+                            },
+                            {   cond: (context) => context.recResult !== 'stop',
+                                target: ".nomatch",
+                            }
+                        ]
                     },
                     states: {
                         prompt: {
@@ -287,7 +290,6 @@ export const dmMenu: MachineConfig<SDSContext, any, SDSEvent> = ({
                                     }),
                                     send('USER_SUCCESS'),
                                 ],
-                                // target: '.start_game',
                             },
                             {
                                 // Word is valid and history does exist and word not in history and move valid
@@ -302,7 +304,6 @@ export const dmMenu: MachineConfig<SDSContext, any, SDSEvent> = ({
                                     }),
                                     send('USER_SUCCESS'),
                                 ],
-                                // target: '.start_game',
                             },
                             {
                                 // Word is valid and history does exist and word not in history and move invalid
@@ -354,9 +355,6 @@ export const dmMenu: MachineConfig<SDSContext, any, SDSEvent> = ({
                             },
                             {
                                 cond: (context) => !computer_move(context.wordHistory),
-                                actions: [
-                                    (context) => console.log("HERE")
-                                ],
                                 target: '.accept_defeat',
                             }
                         ]
@@ -390,13 +388,13 @@ export const dmMenu: MachineConfig<SDSContext, any, SDSEvent> = ({
                                 type: "SPEAK",
                                 value: `${context.computerTurn}`,
                             })),
-                            on: { ENDSPEECH: "#root.dm.init" } 
+                            on: { ENDSPEECH: "wait_for_user_turn" } 
                         },
                         wait_for_user_turn: {    
                             ...promptAndAsk(
-                                "", 
+                                "Your go", 
                                 "It's your go",
-                                "Talk dirty to me.",
+                                "Talk to me.",
                                 "One word. Four letters. Say it.",
                             )
                         },
@@ -408,9 +406,6 @@ export const dmMenu: MachineConfig<SDSContext, any, SDSEvent> = ({
                             on: { ENDSPEECH: "#root.dm.init" }       
                         }
                     }
-                },
-                say_other_word:{
-                    entry: say("other word")
                 },
                 explain_rules: {
                     entry: say("It is explaining again."),

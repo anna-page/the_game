@@ -13,6 +13,7 @@ interface SDSContext {
     confirm: string,
     wordHistory: Array,
     historyLength: number,
+    computerTurn: string,
 }
 
 type SDSEvent =
@@ -24,4 +25,5 @@ type SDSEvent =
     | { type: 'SPEAK', value: string }
     | { type: 'NOINPUT' }
     | { type: 'MAXSPEECH' }
-    | { type: 'RASA_DONE' };
+    | { type: 'RASA_DONE' }
+    | { type: 'USER_SUCCESS' };
