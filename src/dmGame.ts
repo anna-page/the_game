@@ -1,6 +1,7 @@
 import { MachineConfig, Action, assign, actions} from "xstate";
 const {send, cancel} = actions
 import {invoke } from "xstate/lib/actionTypes";
+import { mapContext } from "xstate/lib/utils";
 // import { dmMachine } from "./dmAppointment-old";
 
 
@@ -99,6 +100,18 @@ function one_character_change(new_word: string, old_word: string) {
     } else {
         return false
     }
+}
+
+function computer_move(wordHistory: Array) {
+    var last_word = wordHistory[wordHistory.length - 1]
+    
+    for (var key in grammar) { 
+        if ( one_character_change(key, last_word) ) { 
+            return key
+        } 
+    }
+
+    return false
 }
 
 const grammar: { [index: string]: { valid_word?: string,} } = {
@@ -260,66 +273,93 @@ export const dmMenu: MachineConfig<SDSContext, any, SDSEvent> = ({
                     initial: "prompt",
                     on: {
                         RECOGNISED: [
-                        {
-                            // Word is valid but history does not exist
-                            cond: (context) => "valid_word" in (grammar[context.recResult] || {}) && !Array.isArray(context.wordHistory),
-                            actions: [
-                                cancel('maxsp'),
-                                assign((context) => {
-                                    console.log("Creating history with initial word: " + context.recResult)
-                                    return {
-                                        wordHistory: [grammar[context.recResult].valid_word],
-                                        historyLength: 1,
-                                    }
-                                })
-                            ],
-                            target: 'start_game',
-                        },
-                        {
-                            // Word is valid and history does exist and word not in history and move valid
-                            cond: (context) => "valid_word" in (grammar[context.recResult] || {}) && Array.isArray(context.wordHistory) && !context.wordHistory.includes(context.recResult) && one_character_change(context.recResult, context.wordHistory[context.wordHistory.length - 1]),
-                            actions: [
-                                cancel('maxsp'),
-                                assign((context) => {
-                                    console.log("Updating history with new word: " + context.wordHistory + ',' + context.recResult)
-                                    return {
-                                        historyLength: context.wordHistory.push(grammar[context.recResult].valid_word)
-                                    }
-                                })
-                            ],
-                            target: 'start_game',
-                        },
-                        {
-                            // Word is valid and history does exist and word not in history and move invalid
-                            cond: (context) => "valid_word" in (grammar[context.recResult] || {}) && Array.isArray(context.wordHistory) && !context.wordHistory.includes(context.recResult) && !one_character_change(context.recResult, context.wordHistory[context.wordHistory.length - 1]),
-                            actions: [
-                                cancel('maxsp'),
-                                assign((context) => {
-                                    console.log("Word invalid! " + context.recResult)
-                                })
-                            ],
-                            target: '.lose_game_spelling',
-                        },
-                        {
-                            cond: (context) => context.recResult === 'help',
-                            target: '.help',
-                        },
-                        {
-                            // Word is valid and history does exist and word in history
-                            cond: (context) => "valid_word" in (grammar[context.recResult] || {}) && Array.isArray(context.wordHistory) && context.wordHistory.includes(context.recResult),
-                            actions: [
-                                cancel('maxsp'),
-                                assign((context) => {
-                                    console.log("Word has been said before: " + context.recResult)
-                                })
-                            ],
-                            target: '.lose_game_repetition',
-                        },
-                        {   
-                            cond: (context)=> context.recResult !== 'stop',
-                            target: ".nomatch",
-                        },
-                    ]
+                            {
+                                // Word is valid but history does not exist
+                                cond: (context) => "valid_word" in (grammar[context.recResult] || {}) && !Array.isArray(context.wordHistory),
+                                actions: [
+                                    cancel('maxsp'),
+                                    assign((context) => {
+                                        console.log("Creating history with initial word: " + context.recResult)
+                                        return {
+                                            wordHistory: [grammar[context.recResult].valid_word],
+                                            historyLength: 1,
+                                        }
+                                    }),
+                                    send('USER_SUCCESS'),
+                                ],
+                                // target: '.start_game',
+                            },
+                            {
+                                // Word is valid and history does exist and word not in history and move valid
+                                cond: (context) => "valid_word" in (grammar[context.recResult] || {}) && Array.isArray(context.wordHistory) && !context.wordHistory.includes(context.recResult) && one_character_change(context.recResult, context.wordHistory[context.wordHistory.length - 1]),
+                                actions: [
+                                    cancel('maxsp'),
+                                    assign((context) => {
+                                        console.log("Updating history with new word: " + context.wordHistory + ',' + context.recResult)
+                                        return {
+                                            historyLength: context.wordHistory.push(grammar[context.recResult].valid_word)
+                                        }
+                                    }),
+                                    send('USER_SUCCESS'),
+                                ],
+                                // target: '.start_game',
+                            },
+                            {
+                                // Word is valid and history does exist and word not in history and move invalid
+                                cond: (context) => "valid_word" in (grammar[context.recResult] || {}) && Array.isArray(context.wordHistory) && !context.wordHistory.includes(context.recResult) && !one_character_change(context.recResult, context.wordHistory[context.wordHistory.length - 1]),
+                                actions: [
+                                    cancel('maxsp'),
+                                    assign((context) => {
+                                        console.log("Word invalid! " + context.recResult)
+                                    })
+                                ],
+                                target: '.lose_game_spelling',
+                            },
+                            {
+                                cond: (context) => context.recResult === 'help',
+                                target: '.help',
+                            },
+                            {
+                                // Word is valid and history does exist and word in history
+                                cond: (context) => "valid_word" in (grammar[context.recResult] || {}) && Array.isArray(context.wordHistory) && context.wordHistory.includes(context.recResult),
+                                actions: [
+                                    cancel('maxsp'),
+                                    assign((context) => {
+                                        console.log("Word has been said before: " + context.recResult)
+                                    })
+                                ],
+                                target: '.lose_game_repetition',
+                            },
+                            {   
+                                cond: (context)=> context.recResult !== 'stop',
+                                target: ".nomatch",
+                            },
+                        ],
+                        USER_SUCCESS: [
+                            {
+                                cond: (context) => computer_move(context.wordHistory),
+                                actions: [
+                                    assign((context) => {
+                                        var word = computer_move(context.wordHistory)
+                                        console.log("Computer choice: " + word)
+                                        if (word) {
+                                            return {
+                                                computerTurn: word,
+                                                historyLength: context.wordHistory.push(grammar[word].valid_word)
+                                            }
+                                        }
+                                    }),
+                                ],
+                                target: '.take_turn',
+                            },
+                            {
+                                cond: (context) => !computer_move(context.wordHistory),
+                                actions: [
+                                    (context) => console.log("HERE")
+                                ],
+                                target: '.accept_defeat',
+                            }
+                        ]
                     },
                     states: {
                         prompt:{
@@ -345,6 +385,28 @@ export const dmMenu: MachineConfig<SDSContext, any, SDSEvent> = ({
                             entry: say("You fool! That word is not one character different from the last. You lose."),
                             always: "#root.dm.init",
                         },
+                        take_turn: {
+                            entry: send((context) => ({
+                                type: "SPEAK",
+                                value: `${context.computerTurn}`,
+                            })),
+                            on: { ENDSPEECH: "#root.dm.init" } 
+                        },
+                        wait_for_user_turn: {    
+                            ...promptAndAsk(
+                                "", 
+                                "It's your go",
+                                "Talk dirty to me.",
+                                "One word. Four letters. Say it.",
+                            )
+                        },
+                        accept_defeat: {
+                            entry: send((context) => ({
+                                type: "SPEAK",
+                                value: `Damn. You win. You'll regret this.`
+                            })),
+                            on: { ENDSPEECH: "#root.dm.init" }       
+                        }
                     }
                 },
                 say_other_word:{
