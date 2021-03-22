@@ -114,6 +114,11 @@ function computer_move(wordHistory: Array) {
     return false
 }
 
+function wordToDefine(grammar: Object){
+    var words = Object.keys(dictGrammar)
+    return words[Math.floor(Math.random() * words.length)]
+}
+
 const grammar: { [index: string]: { valid_word?: string,} } = {
     // "back": {valid_word: "back"},
     // "pack": {valid_word: "pack"},
@@ -126,6 +131,12 @@ const grammar: { [index: string]: { valid_word?: string,} } = {
     // "mice": {valid_word: "mice"},
 }
 
+const dictGrammar: {[index: string]: {hard_word?: string,}} = {
+    "reticent": {hard_word: "reticent"},
+    "pastiche": {hard_word: "pastiche"},
+    "pleonasm": {hard_word: "pleonasm"},
+}
+
 const boolgrammar: {[index: string]: {yes?: boolean, no?:boolean}} = {
     "yes": {yes: true },
     "yep": {yes: true },
@@ -135,6 +146,10 @@ const boolgrammar: {[index: string]: {yes?: boolean, no?:boolean}} = {
     "no way": {no: false },
     "nope": {no: false },
 }
+
+const dictionaryQuery = (query: string) => 
+    fetch(new Request(proxyurl+`https://api.dictionaryapi.dev/api/v2/entries/en_GB/${query}`, 
+                {headers: { 'Origin': 'http://localhost:3000' }})).then(resp => resp.json())
 
 
 export const dmMenu: MachineConfig<SDSContext, any, SDSEvent> = ({
@@ -165,7 +180,7 @@ export const dmMenu: MachineConfig<SDSContext, any, SDSEvent> = ({
             },
             states: {
                 hist: {type: 'history', history: 'deep'},
-                prompt:{
+                prompt: {
                     ...promptAndAsk(
                         "Would you like to play a game, or learn a new word?",
                         "Do you want to play a game, or learn a new word?",
@@ -408,12 +423,41 @@ export const dmMenu: MachineConfig<SDSContext, any, SDSEvent> = ({
                     }
                 },
                 explain_rules: {
-                    entry: say("It is explaining again."),
+                    entry: say("The way this game works is that you start by saying a four letter word, then we take turns saying other four letter words that differ by just one letter. And remember, no repeating words! Okay, here we go"),
+                    on: {ENDSPEECH: "start_game"}
                 },
             },
         },
         learnWord: {
-
+            initial: "query",
+            states: {
+                query:{
+                    invoke: {
+                        id: 'worddefinition',
+                        src: (context) => dictionaryQuery(wordToDefine(dictGrammar)),
+                        onDone: {
+                            target: 'answer',
+                            actions:
+                                assign(
+                                    (context,event) => {
+                                        return {
+                                            the_word: event.data[0].word,
+                                            definition: event.data[0].meanings[0].definitions[0].definition,
+                                        }
+                                    }
+                                ),
+                        },
+                        onError: '#root.dm.init',
+                    }
+                },
+                answer:{
+                    entry: send((context) => ({
+                        type: "SPEAK",
+                        value: `Did you know the word ${context.the_word} means ${context.definition}`,
+                    })),
+                    on: { ENDSPEECH: '#root.dm.init' } 
+                }
+            }
         },
         stop: {
             entry: say("Okay, stopping now."),

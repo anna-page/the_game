@@ -14,6 +14,8 @@ interface SDSContext {
     wordHistory: Array,
     historyLength: number,
     computerTurn: string,
+    the_word: string,
+    definition: string,
 }
 
 type SDSEvent =
