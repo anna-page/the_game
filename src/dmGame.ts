@@ -1,8 +1,8 @@
+import { isValidElement } from "react";
 import { MachineConfig, Action, assign, actions} from "xstate";
 const {send, cancel} = actions
 import {invoke } from "xstate/lib/actionTypes";
 import { mapContext } from "xstate/lib/utils";
-// import { dmMachine } from "./dmAppointment-old";
 
 
 
@@ -77,9 +77,9 @@ function getHelp(prompt: string):  MachineConfig<SDSContext, any, SDSEvent> {
             ask: {
                 entry: [
                     send('LISTEN'), 
-                    send('MAXSPEECH', {
-                        delay: 5000,
-                    })
+                    // send('MAXSPEECH', {
+                    //     delay: 5000,
+                    // })
                 ],
             }
         }
@@ -128,13 +128,18 @@ const grammar: { [index: string]: { valid_word?: string,} } = {
     "fake": {valid_word: "fake"},
     "make": {valid_word: "make"},
     // "mace": {valid_word: "mace"},
-    // "mice": {valid_word: "mice"},
+    "mice": {valid_word: "mice"},
 }
 
 const dictGrammar: {[index: string]: {hard_word?: string,}} = {
     "reticent": {hard_word: "reticent"},
     "pastiche": {hard_word: "pastiche"},
     "pleonasm": {hard_word: "pleonasm"},
+    "puce": {hard_word: "puce"},
+    "squalor": {hard_word: "squalor"},
+    "sanguine": {hard_word: "sanguine"},
+    "torrid": {hard_word: "torrid"},
+    "viscous": {hard_word: "viscous"},
 }
 
 const boolgrammar: {[index: string]: {yes?: boolean, no?:boolean}} = {
@@ -166,10 +171,12 @@ export const dmMenu: MachineConfig<SDSContext, any, SDSEvent> = ({
                 RECOGNISED: [
                     {
                         cond: (context) => context.recResult === 'stop',
+                        actions: [cancel('maxsp')],
                         target: 'stop',
                     },
                     {
                         cond: (context) => context.recResult === 'help',
+                        actions: [cancel('maxsp')],
                         target: '.help',
                     },
                     {
@@ -215,6 +222,7 @@ export const dmMenu: MachineConfig<SDSContext, any, SDSEvent> = ({
             }
         },
         answer: {
+            initial: 'wait',
             on: { 
                 RASA_DONE: [{
                     cond: (context: { intentResult: string; }) => "play_a_game" == context.intentResult,
@@ -225,8 +233,21 @@ export const dmMenu: MachineConfig<SDSContext, any, SDSEvent> = ({
                     cond: (context: { intentResult: string; }) => "learn_a_word" == context.intentResult,
                     actions: (context:SDSContext) => console.log('<< LEARN: ' + context.intentResult),
                     target: 'learnWord',
+                },
+                {
+                    actions: [cancel('maxsp')],
+                    target: '.nomatch',
                 }]
             },
+            states:{
+                nomatch: {
+                    entry: say("Sorry I didn't catch that"),
+                    on: { ENDSPEECH: '#root.dm.welcome' },
+                },
+                wait: {
+                    entry: cancel('maxsp'),
+                }
+            }
         },
         playGame: {
             initial: "confirm_rules",
@@ -262,6 +283,7 @@ export const dmMenu: MachineConfig<SDSContext, any, SDSEvent> = ({
                             },
                             {
                                 cond: (context) => context.recResult === 'help',
+                                actions: [cancel('maxsp')],
                                 target: '.help',
                             },
                             {   cond: (context) => context.recResult !== 'stop',
@@ -327,12 +349,16 @@ export const dmMenu: MachineConfig<SDSContext, any, SDSEvent> = ({
                                     cancel('maxsp'),
                                     assign((context) => {
                                         console.log("Word invalid! " + context.recResult)
+                                        return {
+                                            wordHistory: undefined
+                                        }
                                     })
                                 ],
                                 target: '.lose_game_spelling',
                             },
                             {
                                 cond: (context) => context.recResult === 'help',
+                                actions: [cancel('maxsp')],
                                 target: '.help',
                             },
                             {
@@ -342,12 +368,15 @@ export const dmMenu: MachineConfig<SDSContext, any, SDSEvent> = ({
                                     cancel('maxsp'),
                                     assign((context) => {
                                         console.log("Word has been said before: " + context.recResult)
+                                        return {
+                                            wordHistory: undefined
+                                        }
                                     })
                                 ],
                                 target: '.lose_game_repetition',
                             },
                             {   
-                                cond: (context)=> context.recResult !== 'stop',
+                                cond: (context) => context.recResult !== 'stop',
                                 target: ".nomatch",
                             },
                         ],
@@ -370,6 +399,14 @@ export const dmMenu: MachineConfig<SDSContext, any, SDSEvent> = ({
                             },
                             {
                                 cond: (context) => !computer_move(context.wordHistory),
+                                actions: [
+                                    assign((context) => {
+                                        console.log("The computer loses!")
+                                        return {
+                                            wordHistory: undefined
+                                        }
+                                    })
+                                ],
                                 target: '.accept_defeat',
                             }
                         ]
@@ -384,7 +421,7 @@ export const dmMenu: MachineConfig<SDSContext, any, SDSEvent> = ({
                             ),
                         },
                         help: {    
-                            ...getHelp("Say a permitted four letter word")
+                            ...getHelp("Choose a word that is four letters long, differs by only one letter from the previous word, and that has not been said before.")
                         },
                         nomatch: {
                             entry: say("Sorry I didn't catch that"),

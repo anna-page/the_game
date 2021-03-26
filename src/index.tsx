@@ -6,7 +6,6 @@ import { MachineConfig, Action, actions} from "xstate";
 const {send, cancel} = actions
 import { useMachine, asEffect } from "@xstate/react";
 import { inspect } from "@xstate/inspect";
-// import { dmMachine } from "./dmAppointment-old";
 import { dmMenu } from "./dmGame";
 
 
@@ -151,7 +150,7 @@ function App() {
         devTools: true,
         actions: {
             recStart: asEffect(() => {
-                console.log('Ready to receive a color command.');
+                console.log('Ready to receive a command.');
                 listen({
                     interimResults: false,
                     continuous: true
@@ -161,10 +160,10 @@ function App() {
                 console.log('Recognition stopped.');
                 stop()
             }),
-            changeColour: asEffect((context) => {
-                console.log('Repainting...');
-                document.body.style.background = context.recResult;
-            }),
+            // changeColour: asEffect((context) => {
+            //     console.log('Repainting...');
+            //     document.body.style.background = context.recResult;
+            // }),
             ttsStart: asEffect((context, effect) => {
                 console.log('Speaking...');
                 speak({ text: context.ttsAgenda })
